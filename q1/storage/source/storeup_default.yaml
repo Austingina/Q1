@@ -1,0 +1,52 @@
+step_time: 0.01
+duration_time: 3.0
+phase_duration_time: 2.0
+
+joints: [
+  'left_hip_pitch_joint',
+  'left_hip_roll_joint',
+  'left_hip_yaw_joint',
+  'left_knee_joint',
+  'left_ankle_pitch_joint',
+  'left_ankle_roll_joint',
+
+  'right_hip_pitch_joint',
+  'right_hip_roll_joint',
+  'right_hip_yaw_joint',
+  'right_knee_joint',
+  'right_ankle_pitch_joint',
+  'right_ankle_roll_joint',
+
+  'waist_roll_joint',
+  'waist_yaw_joint',
+
+  'left_shoulder_pitch_joint',
+  'left_shoulder_roll_joint',
+  'left_shoulder_yaw_joint',
+  'left_elbow_joint',
+
+  'right_shoulder_pitch_joint',
+  'right_shoulder_roll_joint',
+  'right_shoulder_yaw_joint',
+  'right_elbow_joint',
+]
+
+kps: [
+      80., 80., 80., 60., 90., 80.,
+      80., 80., 80., 60., 90., 80.,
+      100., 50.,
+      20., 20., 20., 20.,
+      20., 20., 20., 20.,
+]
+
+kds: [
+      0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+      0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+      0.5, 0.5,
+      0.5, 0.5, 0.5, 0.5,
+      0.5, 0.5, 0.5, 0.5
+]
+
+# 参考轨迹
+traj_default2fold_path: "./classic/storeup/q1_default2fold_v2.csv"
+# traj_fold2default_path: "./classic/storeup/fold_to_default_pos_v1.0_20260316.csv"

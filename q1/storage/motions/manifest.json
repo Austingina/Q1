@@ -1,0 +1,31 @@
+{
+  "fold": "q1/storage/motions/fold_facedown.npz",
+  "unfold": "q1/storage/motions/unfold_facedown.npz",
+  "frames": 640,
+  "duration_s": 12.78,
+  "entry_joint_max_rad": 0.757529616355896,
+  "deep_bridge_joint_max_rad": 1.5100509226322176,
+  "yaw_alignment_rad": -1.5250031880332253,
+  "output_sha256": {
+    "fold": "f54fe6dd418b3ace55483cc7dd1d17a706dc67e660caadb0fc080342ea9a1869",
+    "unfold": "4d94e1e3e900a9a25f7fd86090f222088720fb3fac9d8186d7281711c3d9ab2f"
+  },
+  "source": {
+    "builder": "q1/storage/build_storage_refs.py",
+    "crawl": {
+      "file": "q1/storage/source/q1_crawl2fold_v1.1_20260722.npz",
+      "sha256": "3adab6a9128af539433a76a66e4e4abfef48fd73d7c08e740de29d0814d2236f"
+    },
+    "deep_fold": {
+      "file": "q1/storage/source/q1_default2fold_v2.csv",
+      "sha256": "35112745d3fab0773e6cc63a9306b29137453cbead522b9216355a98799a92c3"
+    },
+    "lying": {
+      "file": "apps/ref/skills/liedown_facedown.npz",
+      "sha256": "d9323d301c685ecb92e39238428eb2183cde5c43be0f4a7bb157599174513dbe"
+    },
+    "entry_bridge_s": 1.0,
+    "deep_bridge_s": 3.0,
+    "hold_s": 0.5
+  }
+}

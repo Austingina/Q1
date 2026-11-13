@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Q1 行走与舞蹈</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui,-apple-system,sans-serif; }
+    body { margin:0; background:#0b1018; color:#eef4ff; touch-action:manipulation; }
+    main { max-width:520px; margin:auto; padding:18px 18px 108px; }
+    h1 { font-size:22px; margin:0 0 12px; }
+    .card { background:#151e2c; border:1px solid #26364d; border-radius:16px; padding:14px; margin:12px 0; }
+    .state { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    #mode { background:#1f8f68; padding:6px 10px; border-radius:999px; font-weight:700; }
+    #message { color:#aebed3; margin-top:8px; min-height:22px; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    button { min-height:58px; border:0; border-radius:14px; background:#2b4161; color:white; font-size:17px; font-weight:700; }
+    button:active,.held { background:#3d72ad; transform:scale(.98); }
+    button:disabled { background:#25303e; color:#68788c; opacity:.72; transform:none; }
+    .primary { background:#2369a8; }
+    .dance { background:#7a46bb; }
+    .fold { background:#9a641f; }
+    .stop { background:#476070; }
+    .danger { background:#ad3434; }
+    .wide { grid-column:span 3; }
+    .hint { color:#8fa4bf; font-size:13px; line-height:1.5; }
+    .netbad { background:#8a2f2f !important; }
+    #safetyCard { border-color:#286e57; }
+    #reconnect { width:100%; min-height:46px; background:#74531e; }
+    #estopBar { position:fixed; z-index:20; left:50%; bottom:0; transform:translateX(-50%); width:min(520px,calc(100% - 24px)); padding:12px; background:linear-gradient(transparent,#0b1018 30%); }
+    #estop { width:100%; min-height:70px; font-size:20px; box-shadow:0 0 0 2px #e06a6a; touch-action:manipulation; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body><main>
+  <h1>Q1 行走与舞蹈</h1>
+  <section class="card">
+    <div class="state"><strong>控制状态</strong><span id="mode">连接中</span></div>
+    <div id="message">正在读取机器人状态…</div>
+    <div class="hint" id="telemetry"></div>
+  </section>
+
+  <section class="card" id="safetyCard">
+    <div class="state"><strong>断联保护</strong><span id="safetyState">正在连接</span></div>
+    <p class="hint" id="safetyText">网页保持自动心跳，不需要按住授权；锁屏、断网或网页卡死会请求阻尼。</p>
+    <button id="reconnect" hidden>急停后重新连接控制</button>
+  </section>
+
+  <section class="card grid">
+    <button class="primary" data-action="getup">起身</button>
+    <button class="dance" data-action="dance">跳舞</button>
+    <button data-action="liedown">趴下</button>
+    <button class="fold wide" data-action="fold">折叠 / 准备关机</button>
+    <button class="stop wide" data-action="stand">正常停止 / 站立</button>
+  </section>
+
+  <section class="card" id="driveCard">
+    <div class="grid">
+      <span></span><button data-drive="fwd">前进</button><span></span>
+      <button data-drive="left">左移</button><button data-drive="back">后退</button><button data-drive="right">右移</button>
+      <button data-drive="turnL">左转</button><span></span><button data-drive="turnR">右转</button>
+    </div>
+    <p class="hint">只需按住方向即可移动，松手自动回零；首测配置会锁住未允许的动作。底部红色按钮用于立即请求阻尼。</p>
+  </section>
+  <div id="estopBar"><button class="danger" id="estop">立即阻尼急停</button></div>
+</main>
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+const headers = {'Content-Type':'application/json','X-Control-Token':token};
+const held = new Set();
+let profile = 'unknown';
+let controlOnline = false;
+let estopLatched = false;
+let heartbeatBusy = false;
+let capabilities = {can_unfold:false,can_fold:false};
+const map = {fwd:['ly',1],back:['ly',-1],left:['lx',1],right:['lx',-1],turnL:['rx',1],turnR:['rx',-1]};
+function axes(){ const a={lx:0,ly:0,rx:0}; for(const k of held){const [n,v]=map[k];a[n]+=v;} for(const k in a)a[k]=Math.max(-1,Math.min(1,a[k])); return a; }
+async function post(path,data){ const r=await fetch(path,{method:'POST',headers,body:JSON.stringify(data)}); if(!r.ok) throw new Error((await r.json()).error||r.status); return r; }
+function sendDrive(){ post('/api/drive',axes()).catch(showError); }
+function showError(e){
+  document.querySelector('#message').textContent=e?.message||'请求失败';
+  if(e instanceof TypeError) networkBad();
+}
+function networkBad(){
+  document.querySelector('#mode').textContent='连接断开';
+  document.querySelector('#mode').classList.add('netbad');
+  controlOnline=false; held.clear();
+  document.querySelectorAll('[data-drive].held').forEach(x=>x.classList.remove('held'));
+  updateControls();
+}
+function allowed(profile){
+  if(profile==='unknown') return {actions:new Set(['stand']),drive:new Set()};
+  if(profile==='getup') return {actions:new Set(['getup','stand']),drive:new Set()};
+  if(profile==='walk') return {actions:new Set(['getup','stand']),drive:new Set(['fwd','back'])};
+  return {actions:new Set(['getup','dance','liedown','fold','stand']),drive:new Set(Object.keys(map))};
+}
+function updateControls(){
+  const a=allowed(profile), safe=profile!=='off', ready=profile==='off'||(profile!=='unknown'&&controlOnline&&!estopLatched);
+  document.querySelector('#safetyCard').hidden=!safe;
+  for(const b of document.querySelectorAll('[data-action]')){
+    const action=b.dataset.action, needsOnline=action!=='stand';
+    const missingSkill=(action==='fold'&&!capabilities.can_fold)||(action==='getup'&&modeIsFolded()&&!capabilities.can_unfold);
+    b.disabled=!a.actions.has(action)||(needsOnline&&!ready)||missingSkill;
+  }
+  for(const b of document.querySelectorAll('[data-drive]')) b.disabled=!a.drive.has(b.dataset.drive)||!ready;
+  const state=document.querySelector('#safetyState');
+  state.textContent=profile==='unknown'?'正在确认配置':estopLatched?'急停已触发':controlOnline?'保护在线':'等待心跳';
+  state.style.color=controlOnline&&!estopLatched?'#62ddb0':'#ffc867';
+  document.querySelector('#reconnect').hidden=!estopLatched;
+}
+function modeIsFolded(){ return document.querySelector('#mode').textContent==='FOLDED'; }
+async function heartbeat(){
+  if(profile==='off'||profile==='unknown'||estopLatched||heartbeatBusy) return;
+  heartbeatBusy=true;
+  try{
+    await post('/api/session',{active:true});
+    if(estopLatched){ await post('/api/session',{active:false}); controlOnline=false; }
+    else controlOnline=true;
+    updateControls();
+  }catch(err){ networkBad(); }
+  finally{ heartbeatBusy=false; }
+}
+function disconnect(send=true){
+  const wasOnline=controlOnline; controlOnline=false; held.clear();
+  document.querySelectorAll('[data-drive].held').forEach(x=>x.classList.remove('held')); updateControls();
+  if(send&&wasOnline&&profile!=='off'&&profile!=='unknown') post('/api/session',{active:false}).catch(networkBad);
+}
+for(const b of document.querySelectorAll('[data-drive]')){
+  const key=b.dataset.drive;
+  const down=e=>{if(b.disabled)return;e.preventDefault();held.add(key);b.classList.add('held');b.setPointerCapture?.(e.pointerId);sendDrive();};
+  const up=e=>{e.preventDefault();held.delete(key);b.classList.remove('held');sendDrive();};
+  b.addEventListener('pointerdown',down); for(const ev of ['pointerup','pointercancel','lostpointercapture']) b.addEventListener(ev,up);
+}
+for(const b of document.querySelectorAll('[data-action]')) b.addEventListener('click',()=>{
+  if(b.disabled)return;
+  const action=b.dataset.action;
+  if(action==='stand') held.clear();
+  post('/api/action',{action}).catch(showError);
+});
+document.querySelector('#estop').addEventListener('click',async()=>{
+  estopLatched=true; disconnect(false); updateControls();
+  try{ await post('/api/action',{action:'damp'}); }
+  catch(err){ showError(err); }
+});
+document.querySelector('#reconnect').addEventListener('click',()=>{estopLatched=false;updateControls();heartbeat();});
+setInterval(()=>{ if(held.size) sendDrive(); },100);
+setInterval(heartbeat,100);
+setInterval(async()=>{ try{
+  const r=await fetch('/api/status',{headers}); if(!r.ok) throw Error(); const s=await r.json();
+  const m=document.querySelector('#mode'); m.textContent=s.mode||'?'; m.classList.remove('netbad');
+  capabilities={can_unfold:Boolean(s.can_unfold),can_fold:Boolean(s.can_fold)};
+  profile=s.safety_profile||'off'; if(!estopLatched) controlOnline=Boolean(s.control_online); updateControls();
+  const labels={getup:'起身验证：禁止行走和舞蹈',walk:'低速行走：仅前后，前进上限 0.08 m/s',full:'全功能：起身、行走、舞蹈和折叠可直接操作'};
+  if(labels[profile]) document.querySelector('#safetyText').textContent=labels[profile]+`；网页断开或 ${Number(s.heartbeat_timeout||0.3).toFixed(1)} 秒无心跳即请求阻尼。`;
+  document.querySelector('#message').textContent=s.message||'';
+  document.querySelector('#telemetry').textContent=`vx ${Number(s.vx||0).toFixed(2)}  vy ${Number(s.vy||0).toFixed(2)}  wz ${Number(s.wz||0).toFixed(2)}  upright ${Number(s.upright||0).toFixed(2)}`;
+}catch(e){networkBad();}},250);
+updateControls();
+document.addEventListener('visibilitychange',()=>{if(document.hidden)disconnect(true);else heartbeat();});
+addEventListener('pagehide',()=>{
+  fetch('/api/drive?token='+encodeURIComponent(token),{method:'POST',headers:{'Content-Type':'application/json'},body:'{"lx":0,"ly":0,"rx":0}',keepalive:true});
+  if(profile!=='off'&&profile!=='unknown') fetch('/api/session?token='+encodeURIComponent(token),{method:'POST',headers:{'Content-Type':'application/json'},body:'{"active":false}',keepalive:true});
+});
+</script></body></html>

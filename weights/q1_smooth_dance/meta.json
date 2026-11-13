@@ -1,0 +1,27 @@
+{
+ "job": null,
+ "created": "2026-11-12T20:44:28",
+ "robot": "q1",
+ "source_motion": {
+  "input_file": null,
+  "input_sha256": null,
+  "motion_npz_sha256": "9bc30aa9fe7909c83b249f33db4028d2a5c7b645a5ee20c12924646c2c845e16",
+  "any4hdmi_manifest_sha256": null
+ },
+ "code_commit": "2bfc9d26216e40622033bda8df2f5cb129e5bc85",
+ "training": {
+  "mode": "resume",
+  "resumed_from": "/home/cityur/Gina/revenge-q1-retarget/supermimic_training_smoke/resume40_20261112_170656/logs/native_medium/ckpt_latest.pt",
+  "seed": 0,
+  "iteration": 26400,
+  "train_hours": 4.21124252749814,
+  "num_envs": 128,
+  "eval_history": []
+ },
+ "evaluation": null,
+ "onnx": {
+  "opset": 17,
+  "parity_max_abs_err": 4.291534423828125e-06,
+  "parity_inputs": 512
+ }
+}
